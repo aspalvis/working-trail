@@ -1,9 +1,11 @@
-import * as XLSX from 'xlsx';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from "fs";
+import * as path from "path";
+import * as XLSX from "xlsx";
 
-const MAIN_SHEET_NAME = 'Общий';
-const TIMERS_SHEET_NAME = '_timers';
+const MAIN_SHEET_NAME = "Общий";
+const TIMERS_SHEET_NAME = "_timers";
+const PROJECT_META_SHEET_NAME = "_projectMeta"; // legacy
+const SETTINGS_SHEET_NAME = "_settings"; // key-value store
 
 export interface TimeEntry {
   date: string;
@@ -22,19 +24,17 @@ export interface Timer {
 }
 
 function getDataDirectory(): string {
-  const dataDir = path.join(process.cwd(), 'data');
-
+  const dataDir = path.join(process.cwd(), "data");
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
-
   return dataDir;
 }
 
 function getExcelFilePath(): string {
   const now = new Date();
   const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, "0");
   const fileName = `time-tracking-${year}-${month}.xlsx`;
   const dataDir = getDataDirectory();
   return path.join(dataDir, fileName);
@@ -42,11 +42,11 @@ function getExcelFilePath(): string {
 
 function writeWorkbook(workbook: XLSX.WorkBook, filePath: string) {
   try {
-    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
     fs.writeFileSync(filePath, buffer);
   } catch (error: any) {
-    if (error.code === 'EBUSY' || error.code === 'EPERM') {
-      throw new Error('Файл Excel открыт в другой программе. Закройте файл и попробуйте снова.');
+    if (error.code === "EBUSY" || error.code === "EPERM") {
+      throw new Error("Файл Excel открыт в другой программе. Закройте файл и попробуйте снова.");
     }
     throw error;
   }
@@ -55,378 +55,425 @@ function writeWorkbook(workbook: XLSX.WorkBook, filePath: string) {
 function readWorkbook(filePath: string): XLSX.WorkBook {
   try {
     const buffer = fs.readFileSync(filePath);
-    return XLSX.read(buffer, { type: 'buffer' });
+    return XLSX.read(buffer, { type: "buffer" });
   } catch (error: any) {
-    if (error.code === 'EBUSY' || error.code === 'EPERM') {
-      throw new Error('Файл Excel открыт в другой программе. Закройте файл и попробуйте снова.');
+    if (error.code === "EBUSY" || error.code === "EPERM") {
+      throw new Error("Файл Excel открыт в другой программе. Закройте файл и попробуйте снова.");
     }
-    if (error.code === 'ENOENT') {
-      throw new Error('Файл Excel не найден.');
+    if (error.code === "ENOENT") {
+      throw new Error("Файл Excel не найден.");
     }
     throw error;
+  }
+}
+
+function ensureSettingsSheet(workbook: XLSX.WorkBook) {
+  if (!workbook.SheetNames.includes(SETTINGS_SHEET_NAME)) {
+    const sheet = XLSX.utils.aoa_to_sheet([["Key", "Value"]]);
+    XLSX.utils.book_append_sheet(workbook, sheet, SETTINGS_SHEET_NAME);
+    return;
+  }
+  const sheet = workbook.Sheets[SETTINGS_SHEET_NAME];
+  const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  if (data.length === 0) {
+    workbook.Sheets[SETTINGS_SHEET_NAME] = XLSX.utils.aoa_to_sheet([["Key", "Value"]]);
+    return;
+  }
+  const header = data[0];
+  // migrate old format Project/HourlyRateEUR
+  if (header[0] === "Project" && header[1] === "HourlyRateEUR") {
+    const newData: any[][] = [["Key", "Value"]];
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (row[0]) {
+        newData.push([`project:${row[0]}:hourlyRateEUR`, row[1]]);
+      }
+    }
+    workbook.Sheets[SETTINGS_SHEET_NAME] = XLSX.utils.aoa_to_sheet(newData);
+  }
+}
+
+function migrateFromLegacyProjectMeta(workbook: XLSX.WorkBook) {
+  if (!workbook.SheetNames.includes(PROJECT_META_SHEET_NAME)) return;
+  const metaSheet = workbook.Sheets[PROJECT_META_SHEET_NAME];
+  const metaData: any[][] = XLSX.utils.sheet_to_json(metaSheet, { header: 1 });
+  if (metaData.length <= 1) return;
+  const settingsSheet = workbook.Sheets[SETTINGS_SHEET_NAME];
+  const settingsData: any[][] = XLSX.utils.sheet_to_json(settingsSheet, { header: 1 });
+  // only migrate if settings currently empty (only header)
+  if (settingsData.length === 1) {
+    for (let i = 1; i < metaData.length; i++) {
+      const row = metaData[i];
+      if (row[0]) {
+        settingsData.push([`project:${row[0]}:hourlyRateEUR`, row[1]]);
+      }
+    }
+    workbook.Sheets[SETTINGS_SHEET_NAME] = XLSX.utils.aoa_to_sheet(settingsData);
   }
 }
 
 export function initializeExcelFile() {
   try {
     const excelFilePath = getExcelFilePath();
-
     if (!fs.existsSync(excelFilePath)) {
       const workbook = XLSX.utils.book_new();
-
-      const mainSheetData = [
-        ['Дата', 'Общее время (ч)']
-      ];
-      const mainSheet = XLSX.utils.aoa_to_sheet(mainSheetData);
+      // Main sheet
+      const mainSheet = XLSX.utils.aoa_to_sheet([["Дата", "Общее время (ч)"]]);
       XLSX.utils.book_append_sheet(workbook, mainSheet, MAIN_SHEET_NAME);
-
-      const timersSheetData = [
-        ['TimerID', 'Project', 'StartTime', 'ElapsedTime', 'IsRunning']
-      ];
-      const timersSheet = XLSX.utils.aoa_to_sheet(timersSheetData);
+      // Timers sheet
+      const timersSheet = XLSX.utils.aoa_to_sheet([
+        ["TimerID", "Project", "StartTime", "ElapsedTime", "IsRunning"],
+      ]);
       XLSX.utils.book_append_sheet(workbook, timersSheet, TIMERS_SHEET_NAME);
-
+      // Settings sheet (KV)
+      const settingsSheet = XLSX.utils.aoa_to_sheet([["Key", "Value"]]);
+      XLSX.utils.book_append_sheet(workbook, settingsSheet, SETTINGS_SHEET_NAME);
       writeWorkbook(workbook, excelFilePath);
-    } else {
-      const workbook = readWorkbook(excelFilePath);
-      if (!workbook.SheetNames.includes(TIMERS_SHEET_NAME)) {
-        const timersSheetData = [
-          ['TimerID', 'Project', 'StartTime', 'ElapsedTime', 'IsRunning']
-        ];
-        const timersSheet = XLSX.utils.aoa_to_sheet(timersSheetData);
-        XLSX.utils.book_append_sheet(workbook, timersSheet, TIMERS_SHEET_NAME);
-        writeWorkbook(workbook, excelFilePath);
-      }
+      return;
     }
+    const workbook = readWorkbook(excelFilePath);
+    // ensure timers sheet
+    if (!workbook.SheetNames.includes(TIMERS_SHEET_NAME)) {
+      const timersSheet = XLSX.utils.aoa_to_sheet([
+        ["TimerID", "Project", "StartTime", "ElapsedTime", "IsRunning"],
+      ]);
+      XLSX.utils.book_append_sheet(workbook, timersSheet, TIMERS_SHEET_NAME);
+    }
+    ensureSettingsSheet(workbook);
+    migrateFromLegacyProjectMeta(workbook);
+    writeWorkbook(workbook, excelFilePath);
   } catch (error) {
-    console.error('Error initializing Excel file:', error);
-    throw new Error('Не удалось создать файл Excel. Проверьте права доступа к папке data.');
+    console.error("Error initializing Excel file:", error);
+    throw new Error("Не удалось создать файл Excel. Проверьте права доступа к папке data.");
   }
 }
 
-export function getProjects(): string[] {
-  initializeExcelFile();
-
-  const excelFilePath = getExcelFilePath();
-  const workbook = readWorkbook(excelFilePath);
-  const projects = workbook.SheetNames.filter(name =>
-    name !== MAIN_SHEET_NAME && !name.startsWith('_')
-  );
-
-  return projects;
+export interface ProjectWithRate {
+  name: string;
+  hourlyRate: number;
 }
 
-export function addProject(projectName: string) {
+function getSetting(workbook: XLSX.WorkBook, key: string): string | undefined {
+  const sheet = workbook.Sheets[SETTINGS_SHEET_NAME];
+  if (!sheet) return undefined;
+  const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (row[0] === key) return row[1];
+  }
+  return undefined;
+}
+
+function setSetting(workbook: XLSX.WorkBook, key: string, value: string | number) {
+  ensureSettingsSheet(workbook);
+  const sheet = workbook.Sheets[SETTINGS_SHEET_NAME];
+  const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  if (data.length === 0) data.push(["Key", "Value"]);
+  const idx = data.findIndex((row, i) => i > 0 && row[0] === key);
+  if (idx !== -1) {
+    data[idx][1] = value;
+  } else {
+    data.push([key, value]);
+  }
+  workbook.Sheets[SETTINGS_SHEET_NAME] = XLSX.utils.aoa_to_sheet(data);
+}
+
+function getHourlyRate(projectName: string, workbook: XLSX.WorkBook): number {
+  const v = getSetting(workbook, `project:${projectName}:hourlyRateEUR`);
+  const n = parseFloat(v || "0");
+  return isNaN(n) ? 0 : n;
+}
+
+export function getProjects(): ProjectWithRate[] {
+  initializeExcelFile();
+  const excelFilePath = getExcelFilePath();
+  const workbook = readWorkbook(excelFilePath);
+  const projectNames = workbook.SheetNames.filter(
+    (name) => name !== MAIN_SHEET_NAME && !name.startsWith("_")
+  );
+  return projectNames.map((name) => ({ name, hourlyRate: getHourlyRate(name, workbook) }));
+}
+
+export function addProject(projectName: string, hourlyRate: number = 0) {
   try {
     initializeExcelFile();
-
     const excelFilePath = getExcelFilePath();
     const workbook = readWorkbook(excelFilePath);
-
     if (workbook.SheetNames.includes(projectName)) {
-      throw new Error('Проект уже существует');
+      throw new Error("Проект уже существует");
     }
-
-    const projectSheetData = [
-      ['Дата', 'Время начала', 'Время окончания', 'Длительность (ч)', 'Описание']
-    ];
-    const projectSheet = XLSX.utils.aoa_to_sheet(projectSheetData);
+    const projectSheet = XLSX.utils.aoa_to_sheet([
+      ["Дата", "Время начала", "Время окончания", "Длительность (ч)", "Описание", "Стоимость (€)"],
+    ]);
     XLSX.utils.book_append_sheet(workbook, projectSheet, projectName);
-
+    // update main sheet header
     const mainSheet = workbook.Sheets[MAIN_SHEET_NAME];
     const mainData: any[][] = XLSX.utils.sheet_to_json(mainSheet, { header: 1 });
-
-    if (mainData.length > 0) {
+    if (mainData.length === 0) {
+      mainData.push(["Дата", "Общее время (ч)", projectName]);
+    } else if (!mainData[0].includes(projectName)) {
       mainData[0].push(projectName);
     }
-
-    const newMainSheet = XLSX.utils.aoa_to_sheet(mainData);
-    workbook.Sheets[MAIN_SHEET_NAME] = newMainSheet;
-
+    workbook.Sheets[MAIN_SHEET_NAME] = XLSX.utils.aoa_to_sheet(mainData);
+    setSetting(workbook, `project:${projectName}:hourlyRateEUR`, hourlyRate);
     writeWorkbook(workbook, excelFilePath);
   } catch (error: any) {
-    console.error('Error adding project:', error);
-    if (error.message === 'Проект уже существует') {
-      throw error;
-    }
-    throw new Error('Не удалось добавить проект. Проверьте права доступа к папке data.');
+    console.error("Error adding project:", error);
+    if (error.message === "Проект уже существует") throw error;
+    throw new Error("Не удалось добавить проект. Проверьте права доступа к папке data.");
+  }
+}
+
+export function updateProjectRate(projectName: string, hourlyRate: number) {
+  try {
+    initializeExcelFile();
+    const excelFilePath = getExcelFilePath();
+    const workbook = readWorkbook(excelFilePath);
+    setSetting(workbook, `project:${projectName}:hourlyRateEUR`, hourlyRate);
+    writeWorkbook(workbook, excelFilePath);
+  } catch (error) {
+    console.error("Error updating project rate:", error);
+    throw new Error("Не удалось обновить ставку проекта.");
   }
 }
 
 export function saveTimeEntry(entry: TimeEntry) {
   try {
     initializeExcelFile();
-
     const excelFilePath = getExcelFilePath();
     const workbook = readWorkbook(excelFilePath);
-
     if (!workbook.SheetNames.includes(entry.project)) {
-      addProject(entry.project);
+      addProject(entry.project); // default rate 0
       return saveTimeEntry(entry);
     }
-
-    const projectSheet = workbook.Sheets[entry.project];
-    const projectData: any[][] = XLSX.utils.sheet_to_json(projectSheet, { header: 1 });
-
-    projectData.push([
-      entry.date,
-      entry.startTime,
-      entry.endTime,
-      entry.duration,
-      ''
-    ]);
-
-    const newProjectSheet = XLSX.utils.aoa_to_sheet(projectData);
-    workbook.Sheets[entry.project] = newProjectSheet;
-
+    const sheet = workbook.Sheets[entry.project];
+    const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    if (data.length > 0) {
+      const header = data[0];
+      if (!header.includes("Стоимость (€)")) {
+        const oldIdx = header.indexOf("Стоимость");
+        if (oldIdx !== -1) header[oldIdx] = "Стоимость (€)";
+        else header.push("Стоимость (€)");
+      }
+    }
+    const hourlyRate = getHourlyRate(entry.project, workbook);
+    const cost = parseFloat((entry.duration * hourlyRate).toFixed(2));
+    data.push([entry.date, entry.startTime, entry.endTime, entry.duration, "", cost]);
+    workbook.Sheets[entry.project] = XLSX.utils.aoa_to_sheet(data);
     updateMainSheet(workbook, entry.project, entry.date, entry.duration);
-
     writeWorkbook(workbook, excelFilePath);
   } catch (error) {
-    console.error('Error saving time entry:', error);
-    throw new Error('Не удалось сохранить запись времени. Убедитесь, что файл Excel не открыт в другой программе.');
+    console.error("Error saving time entry:", error);
+    throw new Error(
+      "Не удалось сохранить запись времени. Убедитесь, что файл Excel не открыт в другой программе."
+    );
   }
 }
 
 function updateMainSheet(workbook: XLSX.WorkBook, project: string, date: string, duration: number) {
-  const mainSheet = workbook.Sheets[MAIN_SHEET_NAME];
-  const mainData: any[][] = XLSX.utils.sheet_to_json(mainSheet, { header: 1 });
-
-  if (mainData.length === 0) {
-    mainData.push(['Дата', 'Общее время (ч)', project]);
+  const sheet = workbook.Sheets[MAIN_SHEET_NAME];
+  const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  if (data.length === 0) {
+    data.push(["Дата", "Общее время (ч)", project]);
   }
-
-  const headers = mainData[0];
-  const projectIndex = headers.indexOf(project);
-
-  if (projectIndex === -1) {
-    headers.push(project);
-  }
-
-  const dateRowIndex = mainData.findIndex((row, idx) => idx > 0 && row[0] === date);
-
-  if (dateRowIndex !== -1) {
-    const row = mainData[dateRowIndex];
-    const currentProjectTime = parseFloat(row[projectIndex] || '0');
-    row[projectIndex] = currentProjectTime + duration;
-
-    const totalTime = headers.slice(2).reduce((sum, _, idx) => {
-      return sum + parseFloat(row[idx + 2] || '0');
-    }, 0);
-    row[1] = totalTime;
+  const header = data[0];
+  if (!header.includes(project)) header.push(project);
+  const projectIndex = header.indexOf(project);
+  let rowIndex = data.findIndex((row, i) => i > 0 && row[0] === date);
+  if (rowIndex !== -1) {
+    const row = data[rowIndex];
+    const current = parseFloat(row[projectIndex] || "0");
+    row[projectIndex] = current + duration;
+    // recalc total (col 1)
+    const total = header.slice(2).reduce((sum, _, idx) => sum + parseFloat(row[idx + 2] || "0"), 0);
+    row[1] = total;
   } else {
-    const newRow: any[] = new Array(headers.length).fill(0);
+    const newRow: any[] = new Array(header.length).fill(0);
     newRow[0] = date;
     newRow[projectIndex] = duration;
+    // total equals duration for this new date
     newRow[1] = duration;
-    mainData.push(newRow);
+    data.push(newRow);
   }
-
-  const newMainSheet = XLSX.utils.aoa_to_sheet(mainData);
-  workbook.Sheets[MAIN_SHEET_NAME] = newMainSheet;
+  workbook.Sheets[MAIN_SHEET_NAME] = XLSX.utils.aoa_to_sheet(data);
 }
 
-export function getProjectEntries(projectName: string): TimeEntry[] {
-  initializeExcelFile();
+export interface TimeEntryWithCost extends TimeEntry {
+  cost: number;
+  hourlyRate: number;
+}
 
+export function getProjectEntries(projectName: string): TimeEntryWithCost[] {
+  initializeExcelFile();
   const excelFilePath = getExcelFilePath();
   const workbook = readWorkbook(excelFilePath);
-
-  if (!workbook.SheetNames.includes(projectName)) {
-    return [];
-  }
-
-  const projectSheet = workbook.Sheets[projectName];
-  const projectData: any[][] = XLSX.utils.sheet_to_json(projectSheet, { header: 1 });
-
-  return projectData.slice(1).map(row => ({
-    date: row[0] || '',
-    startTime: row[1] || '',
-    endTime: row[2] || '',
-    duration: parseFloat(row[3] || '0'),
-    project: projectName
-  }));
+  if (!workbook.SheetNames.includes(projectName)) return [];
+  const sheet = workbook.Sheets[projectName];
+  const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  const hourlyRate = getHourlyRate(projectName, workbook);
+  const header = data[0] || [];
+  let costIndex = header.indexOf("Стоимость (€)");
+  if (costIndex === -1) costIndex = header.indexOf("Стоимость");
+  return data.slice(1).map((row) => {
+    const duration = parseFloat(row[3] || "0");
+    const cost =
+      costIndex !== -1
+        ? parseFloat(row[costIndex] || "0")
+        : parseFloat((duration * hourlyRate).toFixed(2));
+    return {
+      date: row[0] || "",
+      startTime: row[1] || "",
+      endTime: row[2] || "",
+      duration,
+      project: projectName,
+      cost,
+      hourlyRate,
+    };
+  });
 }
 
 export function getActiveTimers(): Timer[] {
   initializeExcelFile();
-
   const excelFilePath = getExcelFilePath();
   const workbook = readWorkbook(excelFilePath);
-
-  if (!workbook.SheetNames.includes(TIMERS_SHEET_NAME)) {
-    return [];
-  }
-
-  const timersSheet = workbook.Sheets[TIMERS_SHEET_NAME];
-  const timersData: any[][] = XLSX.utils.sheet_to_json(timersSheet, { header: 1 });
-
-  return timersData.slice(1).map(row => ({
-    timerId: row[0] || '',
-    project: row[1] || '',
-    startTime: row[2] || '',
-    elapsedTime: parseFloat(row[3] || '0'),
-    isRunning: row[4] === true || row[4] === 'true'
+  if (!workbook.SheetNames.includes(TIMERS_SHEET_NAME)) return [];
+  const sheet = workbook.Sheets[TIMERS_SHEET_NAME];
+  const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  return data.slice(1).map((row) => ({
+    timerId: row[0] || "",
+    project: row[1] || "",
+    startTime: row[2] || "",
+    elapsedTime: parseFloat(row[3] || "0"),
+    isRunning: row[4] === true || row[4] === "true",
   }));
 }
 
 export function getTimer(timerId: string): Timer | null {
   const timers = getActiveTimers();
-  return timers.find(t => t.timerId === timerId) || null;
+  return timers.find((t) => t.timerId === timerId) || null;
 }
 
 export function startTimer(timerId: string, project: string): Timer {
   try {
     initializeExcelFile();
-
     const excelFilePath = getExcelFilePath();
     const workbook = readWorkbook(excelFilePath);
-
-    const timersSheet = workbook.Sheets[TIMERS_SHEET_NAME];
-    const timersData: any[][] = XLSX.utils.sheet_to_json(timersSheet, { header: 1 });
-
-    const existingIndex = timersData.findIndex((row, idx) => idx > 0 && row[0] === timerId);
-
+    const sheet = workbook.Sheets[TIMERS_SHEET_NAME];
+    const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    const idx = data.findIndex((row, i) => i > 0 && row[0] === timerId);
     const timer: Timer = {
       timerId,
       project,
       startTime: new Date().toISOString(),
       elapsedTime: 0,
-      isRunning: true
+      isRunning: true,
     };
-
-    if (existingIndex !== -1) {
-      timersData[existingIndex] = [
+    if (idx !== -1) {
+      data[idx] = [
         timer.timerId,
         timer.project,
         timer.startTime,
         timer.elapsedTime,
-        timer.isRunning
+        timer.isRunning,
       ];
     } else {
-      timersData.push([
+      data.push([
         timer.timerId,
         timer.project,
         timer.startTime,
         timer.elapsedTime,
-        timer.isRunning
+        timer.isRunning,
       ]);
     }
-
-    const newTimersSheet = XLSX.utils.aoa_to_sheet(timersData);
-    workbook.Sheets[TIMERS_SHEET_NAME] = newTimersSheet;
-
+    workbook.Sheets[TIMERS_SHEET_NAME] = XLSX.utils.aoa_to_sheet(data);
     writeWorkbook(workbook, excelFilePath);
-
     return timer;
   } catch (error) {
-    console.error('Error starting timer:', error);
-    throw new Error('Не удалось запустить таймер.');
+    console.error("Error starting timer:", error);
+    throw new Error("Не удалось запустить таймер.");
   }
 }
 
 export function updateTimer(timerId: string, elapsedTime: number): Timer | null {
   try {
     initializeExcelFile();
-
     const excelFilePath = getExcelFilePath();
     const workbook = readWorkbook(excelFilePath);
-
-    const timersSheet = workbook.Sheets[TIMERS_SHEET_NAME];
-    const timersData: any[][] = XLSX.utils.sheet_to_json(timersSheet, { header: 1 });
-
-    const timerIndex = timersData.findIndex((row, idx) => idx > 0 && row[0] === timerId);
-
-    if (timerIndex === -1) {
-      return null;
-    }
-
-    timersData[timerIndex][3] = elapsedTime;
-
-    const newTimersSheet = XLSX.utils.aoa_to_sheet(timersData);
-    workbook.Sheets[TIMERS_SHEET_NAME] = newTimersSheet;
-
+    const sheet = workbook.Sheets[TIMERS_SHEET_NAME];
+    const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    const idx = data.findIndex((row, i) => i > 0 && row[0] === timerId);
+    if (idx === -1) return null;
+    data[idx][3] = elapsedTime;
+    workbook.Sheets[TIMERS_SHEET_NAME] = XLSX.utils.aoa_to_sheet(data);
     writeWorkbook(workbook, excelFilePath);
-
-    const timer: Timer = {
-      timerId: timersData[timerIndex][0],
-      project: timersData[timerIndex][1],
-      startTime: timersData[timerIndex][2],
-      elapsedTime: timersData[timerIndex][3],
-      isRunning: timersData[timerIndex][4] === true || timersData[timerIndex][4] === 'true'
+    return {
+      timerId: data[idx][0],
+      project: data[idx][1],
+      startTime: data[idx][2],
+      elapsedTime: data[idx][3],
+      isRunning: data[idx][4] === true || data[idx][4] === "true",
     };
-
-    return timer;
   } catch (error) {
-    console.error('Error updating timer:', error);
-    throw new Error('Не удалось обновить таймер.');
+    console.error("Error updating timer:", error);
+    throw new Error("Не удалось обновить таймер.");
   }
 }
 
 export function stopTimer(timerId: string): Timer | null {
   try {
     initializeExcelFile();
-
     const excelFilePath = getExcelFilePath();
     const workbook = readWorkbook(excelFilePath);
-
-    const timersSheet = workbook.Sheets[TIMERS_SHEET_NAME];
-    const timersData: any[][] = XLSX.utils.sheet_to_json(timersSheet, { header: 1 });
-
-    const timerIndex = timersData.findIndex((row, idx) => idx > 0 && row[0] === timerId);
-
-    if (timerIndex === -1) {
-      return null;
-    }
-
-    timersData[timerIndex][4] = false;
-
-    const newTimersSheet = XLSX.utils.aoa_to_sheet(timersData);
-    workbook.Sheets[TIMERS_SHEET_NAME] = newTimersSheet;
-
+    const sheet = workbook.Sheets[TIMERS_SHEET_NAME];
+    const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    const idx = data.findIndex((row, i) => i > 0 && row[0] === timerId);
+    if (idx === -1) return null;
+    data[idx][4] = false;
+    workbook.Sheets[TIMERS_SHEET_NAME] = XLSX.utils.aoa_to_sheet(data);
     writeWorkbook(workbook, excelFilePath);
-
-    const timer: Timer = {
-      timerId: timersData[timerIndex][0],
-      project: timersData[timerIndex][1],
-      startTime: timersData[timerIndex][2],
-      elapsedTime: timersData[timerIndex][3],
-      isRunning: false
+    return {
+      timerId: data[idx][0],
+      project: data[idx][1],
+      startTime: data[idx][2],
+      elapsedTime: data[idx][3],
+      isRunning: false,
     };
-
-    return timer;
   } catch (error) {
-    console.error('Error stopping timer:', error);
-    throw new Error('Не удалось остановить таймер.');
+    console.error("Error stopping timer:", error);
+    throw new Error("Не удалось остановить таймер.");
   }
 }
 
 export function deleteTimer(timerId: string): boolean {
   try {
     initializeExcelFile();
-
     const excelFilePath = getExcelFilePath();
     const workbook = readWorkbook(excelFilePath);
-
-    const timersSheet = workbook.Sheets[TIMERS_SHEET_NAME];
-    const timersData: any[][] = XLSX.utils.sheet_to_json(timersSheet, { header: 1 });
-
-    const timerIndex = timersData.findIndex((row, idx) => idx > 0 && row[0] === timerId);
-
-    if (timerIndex === -1) {
-      return false;
-    }
-
-    timersData.splice(timerIndex, 1);
-
-    const newTimersSheet = XLSX.utils.aoa_to_sheet(timersData);
-    workbook.Sheets[TIMERS_SHEET_NAME] = newTimersSheet;
-
+    const sheet = workbook.Sheets[TIMERS_SHEET_NAME];
+    const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    const idx = data.findIndex((row, i) => i > 0 && row[0] === timerId);
+    if (idx === -1) return false;
+    data.splice(idx, 1);
+    workbook.Sheets[TIMERS_SHEET_NAME] = XLSX.utils.aoa_to_sheet(data);
     writeWorkbook(workbook, excelFilePath);
-
     return true;
   } catch (error) {
-    console.error('Error deleting timer:', error);
-    throw new Error('Не удалось удалить таймер.');
+    console.error("Error deleting timer:", error);
+    throw new Error("Не удалось удалить таймер.");
   }
+}
+
+// Generic external accessors (optional usage)
+export function getSettingValue(key: string): string | undefined {
+  initializeExcelFile();
+  const workbook = readWorkbook(getExcelFilePath());
+  return getSetting(workbook, key);
+}
+
+export function setSettingValue(key: string, value: string | number): void {
+  initializeExcelFile();
+  const file = getExcelFilePath();
+  const workbook = readWorkbook(file);
+  setSetting(workbook, key, value);
+  writeWorkbook(workbook, file);
 }
