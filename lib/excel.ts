@@ -6,6 +6,7 @@ const MAIN_SHEET_NAME = "Общий";
 const TIMERS_SHEET_NAME = "_timers";
 const PROJECT_META_SHEET_NAME = "_projectMeta"; // legacy
 const SETTINGS_SHEET_NAME = "_settings"; // key-value store
+const ANALYTICS_SHEET_NAME = "Аналитика"; // summary/analytics sheet
 
 export interface TimeEntry {
   date: string;
@@ -141,6 +142,7 @@ export function initializeExcelFile() {
     }
     ensureSettingsSheet(workbook);
     migrateFromLegacyProjectMeta(workbook);
+    rebuildAnalyticsSheet(workbook);
     writeWorkbook(workbook, excelFilePath);
   } catch (error) {
     console.error("Error initializing Excel file:", error);
@@ -176,6 +178,8 @@ function setSetting(workbook: XLSX.WorkBook, key: string, value: string | number
     data.push([key, value]);
   }
   workbook.Sheets[SETTINGS_SHEET_NAME] = XLSX.utils.aoa_to_sheet(data);
+  // when settings change, regenerate analytics if present
+  rebuildAnalyticsSheet(workbook);
 }
 
 function getHourlyRate(projectName: string, workbook: XLSX.WorkBook): number {
@@ -216,6 +220,7 @@ export function addProject(projectName: string, hourlyRate: number = 0) {
     }
     workbook.Sheets[MAIN_SHEET_NAME] = XLSX.utils.aoa_to_sheet(mainData);
     setSetting(workbook, `project:${projectName}:hourlyRateEUR`, hourlyRate);
+    rebuildAnalyticsSheet(workbook);
     writeWorkbook(workbook, excelFilePath);
   } catch (error: any) {
     console.error("Error adding project:", error);
@@ -230,6 +235,7 @@ export function updateProjectRate(projectName: string, hourlyRate: number) {
     const excelFilePath = getExcelFilePath();
     const workbook = readWorkbook(excelFilePath);
     setSetting(workbook, `project:${projectName}:hourlyRateEUR`, hourlyRate);
+    rebuildAnalyticsSheet(workbook);
     writeWorkbook(workbook, excelFilePath);
   } catch (error) {
     console.error("Error updating project rate:", error);
@@ -261,6 +267,7 @@ export function saveTimeEntry(entry: TimeEntry) {
     data.push([entry.date, entry.startTime, entry.endTime, entry.duration, "", cost]);
     workbook.Sheets[entry.project] = XLSX.utils.aoa_to_sheet(data);
     updateMainSheet(workbook, entry.project, entry.date, entry.duration);
+    rebuildAnalyticsSheet(workbook);
     writeWorkbook(workbook, excelFilePath);
   } catch (error) {
     console.error("Error saving time entry:", error);
@@ -296,6 +303,7 @@ function updateMainSheet(workbook: XLSX.WorkBook, project: string, date: string,
     data.push(newRow);
   }
   workbook.Sheets[MAIN_SHEET_NAME] = XLSX.utils.aoa_to_sheet(data);
+  // do not rebuild analytics here to avoid multiple calls in a single save; caller handles
 }
 
 export interface TimeEntryWithCost extends TimeEntry {
@@ -475,5 +483,72 @@ export function setSettingValue(key: string, value: string | number): void {
   const file = getExcelFilePath();
   const workbook = readWorkbook(file);
   setSetting(workbook, key, value);
+  rebuildAnalyticsSheet(workbook);
   writeWorkbook(workbook, file);
+}
+
+// Build analytics sheet with formulas (hours, cost, percentages)
+function rebuildAnalyticsSheet(workbook: XLSX.WorkBook) {
+  // collect project names
+  const projectNames = workbook.SheetNames.filter(
+    (name) => name !== MAIN_SHEET_NAME && !name.startsWith("_") && name !== ANALYTICS_SHEET_NAME
+  );
+  const rows: any[][] = [
+    ["Проект", "Часы (SUM)", "Ставка (€/ч)", "Стоимость (€)", "% Часы", "% Стоимость"],
+  ];
+  // placeholder rows; formulas added after we know total row index
+  for (let i = 0; i < projectNames.length; i++) {
+    const project = projectNames[i];
+    const rate = getHourlyRate(project, workbook);
+    const rowIndexExcel = i + 2; // Excel row number (1-based) for this project
+    // Hours formula: SUM of Duration column (column D) in project sheet
+    const hoursFormula = `SUM('${project}'!D:D)`;
+    // Cost formula: Hours * Rate (rounded)
+    const costFormula = `ROUND(B${rowIndexExcel}*C${rowIndexExcel},2)`;
+    rows.push([project, { f: hoursFormula }, rate, { f: costFormula }, "", ""]);
+  }
+  const totalRowIndexExcel = projectNames.length + 2;
+  if (projectNames.length > 0) {
+    // add percentages formulas now that total row index is known
+    for (let i = 0; i < projectNames.length; i++) {
+      const excelRow = i + 2;
+      // % Hours
+      (rows[i + 1][4] as any) = {
+        f: `IF(SUM(B2:B${totalRowIndexExcel - 1})=0,0,B${excelRow}/SUM(B2:B${
+          totalRowIndexExcel - 1
+        }))`,
+      };
+      // % Cost
+      (rows[i + 1][5] as any) = {
+        f: `IF(SUM(D2:D${totalRowIndexExcel - 1})=0,0,D${excelRow}/SUM(D2:D${
+          totalRowIndexExcel - 1
+        }))`,
+      };
+    }
+  }
+  // Totals row
+  rows.push([
+    "ИТОГО",
+    { f: `SUM(B2:B${totalRowIndexExcel - 1})` },
+    "",
+    { f: `SUM(D2:D${totalRowIndexExcel - 1})` },
+    "",
+    "",
+  ]);
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  // Column widths for readability
+  (sheet as any)["!cols"] = [
+    { wch: 28 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 16 },
+    { wch: 10 },
+    { wch: 12 },
+  ];
+  // Replace or append sheet
+  if (workbook.SheetNames.includes(ANALYTICS_SHEET_NAME)) {
+    workbook.Sheets[ANALYTICS_SHEET_NAME] = sheet;
+  } else {
+    XLSX.utils.book_append_sheet(workbook, sheet, ANALYTICS_SHEET_NAME);
+  }
 }
