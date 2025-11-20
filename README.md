@@ -1,78 +1,69 @@
 # Time Tracking
 
-An application for tracking time spent on projects with data saved to Excel.
+An application for tracking time spent on projects with data saved to SQLite database.
 
 ## Features
 
 - 🎨 Modern and responsive UI with animations
 - 📁 Create and manage projects (+ hourly rate)
 - ⏱️ Stopwatch for time tracking (works in-memory)
-- 💾 Automatic saving to Excel when stopping the timer
-- 📊 Each project gets a separate sheet in Excel
+- 💾 Automatic saving to SQLite database when stopping the timer
+- 📊 All project data stored in a single SQLite database
 - 💰 Automatic cost calculation based on rate (hours \* rate)
 - 🛠️ "Project Management" window for creating and modifying rates
-- 📈 Summary sheet with overview of all projects
+- 📈 Automatic analytics calculation
 - 🌓 Dark theme support
 - ⚡ Loading and save status indicators
 - 🎯 Visual feedback for all actions
 
-## Excel File Structure
+## Database Structure
 
-Files are automatically created in the `data/` folder with the name `time-tracking-YYYY-MM.xlsx` (e.g., `data/time-tracking-2025-11.xlsx`). A separate file is created for each month. The `data` folder is created automatically on first run. Each file contains:
+The application uses SQLite database stored in the `data/` folder as `time-tracking.db`. The `data` folder is created automatically on first run. The database contains the following tables:
 
-### "Summary" Sheet
+### Projects Table
 
-- "Date" column - entry date
-- "Total Time (h)" column - total time per day
-- For each project - a separate column with time spent
+Stores all projects with their hourly rates:
 
-### Project Sheets
+- `id` — unique project identifier
+- `name` — project name (unique)
+- `hourly_rate` — hourly rate in euros (default: 0)
 
-A separate sheet is created for each project with columns:
+### Time Entries Table
 
-- Date (YYYY-MM-DD format, e.g. 2025-11-20)
-- Start Time
-- End Time
-- Duration (h)
-- Description
-- Cost (€)
+Stores all time entries for all projects:
 
-**Important:** The application automatically normalizes dates from old formats (DD.MM.YYYY) to standard ISO format (YYYY-MM-DD) when reading data. This ensures compatibility with HTML date picker and consistency throughout the system.
+- `id` — unique entry identifier
+- `project_id` — reference to project
+- `date` — entry date (YYYY-MM-DD format)
+- `start_time` — start time
+- `end_time` — end time
+- `duration` — duration in hours
+- `description` — entry description (optional)
 
-### Project Rate and Settings
+All dates are stored in ISO format (YYYY-MM-DD) for consistency with HTML date picker.
 
-The service sheet `_settings` is now a universal key-value storage with columns:
+### Timers Table
 
-- Key
-- Value
+Stores active and stopped timers:
 
-Project rates are saved with a key in the format:
+- `timer_id` — unique timer identifier
+- `project_id` — reference to project
+- `start_time` — timer start time (ISO format)
+- `elapsed_time` — elapsed time in seconds
+- `is_running` — timer status (1 = running, 0 = stopped)
 
-```
-project:<ProjectName>:hourlyRateEUR
-```
+### Settings Table
 
-For example: `project:Website:hourlyRateEUR -> 45`.
+Universal key-value storage for application settings:
 
-On first transition from the old format (columns `Project` / `HourlyRateEUR` or `_projectMeta` sheet), automatic migration to the new KV format is performed. The rate can be specified when creating a project or changed later in the "Project Management" modal. The value is stored in euros. If no rate is set, 0 is used.
+- `key` — setting key
+- `value` — setting value
 
-### "Analytics" Sheet
-
-Automatically created and updated when creating projects, changing rates, and adding time entries. Contains:
-
-- Project — project name
-- Hours (SUM) — formula `SUM('<Project>'!D:D)` sums durations
-- Rate (€/h) — numeric value from `_settings`
-- Cost (€) — formula `ROUND(Bx*Cx,2)` (hours \* rate)
-- % Hours — project hours as percentage of total time `B x / SUM(B2:Bn)`
-- % Cost — project cost as percentage `D x / SUM(D2:Dn)`
-- Total row with sums for hours and cost
-
-Technically, the sheet is created in the file as `Аналитика` and can be recreated — manual edits on it are not preserved.
+Project hourly rates and other settings are stored here.
 
 ### Cost Calculation
 
-When saving a time entry to the project sheet, the cost in euros is calculated: `Duration * Rate` (rounded to 2 decimal places). Old sheets with a "Cost" column without currency specification will be renamed to "Cost (€)" on the next update.
+When saving a time entry, the cost in euros is automatically calculated: `Duration * Rate` (rounded to 2 decimal places). The cost is calculated on-the-fly when querying data, ensuring it's always up-to-date with the current rate.
 
 ## Installation and Running
 
@@ -93,7 +84,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 3. Click "Start" to begin tracking time
    - Timer works in memory and doesn't create disk load
    - Visual indication of running timer (pulsing effect)
-4. Click "Stop" to stop and automatically save to Excel
+4. Click "Stop" to stop and automatically save to SQLite database
    - A save indicator will appear
    - Data is saved only on stop
 5. To change project, click "Change Project"
@@ -112,7 +103,9 @@ The "Edit Entries" page (`/time-entries`) allows you to:
 
 ### Exporting Project Data
 
-For each project, an export function to a separate XLSX file is available:
+The application provides advanced XLSX export functionality with formulas, formatting, and multiple sheets.
+
+#### Export Single Project
 
 **From "Project Management":**
 
@@ -125,12 +118,64 @@ For each project, an export function to a separate XLSX file is available:
 2. Select a project in the filter
 3. Click the "Export [project name]" button
 
-The file will be downloaded with a name in the format: `month-year-project.xlsx` (e.g., `11-2025-Website.xlsx`)
+**API Endpoint:**
+```
+GET /api/export?project=ProjectName
+```
 
-The exported file contains two sheets:
+The exported XLSX file (`month-year-project.xlsx`) contains 3 sheets:
 
-- **Time Entries** — all time entries for the selected project with columns: Date, Start Time, End Time, Duration (h), Description, Cost (€)
-- **Analytics** — summary information: total hours, rate, total cost, number of entries, and work period
+**1. Записи времени (Time Entries)**
+- All time entries with columns: Date, Start Time, End Time, Duration (h), Cost (€)
+- **Formulas**: Cost calculated as `Duration * Rate`
+- **Totals row**: SUM formulas for total hours and cost
+- **AutoFilter**: Enabled for easy sorting and filtering
+
+**2. Сводка (Summary)**
+- Project overview and statistics
+- Hourly rate, total hours, total cost
+- Work period (start/end dates)
+- Statistics: unique days, average hours/day, min/max entries
+- **Cross-sheet formulas**: References totals from Time Entries sheet
+
+**3. Аналитика по датам (Analytics by Date)**
+- Daily breakdown of work
+- Columns: Date, # of Entries, Hours, Cost, % of Total Hours, % of Total Cost
+- **Formulas**: Percentages calculated dynamically
+- **Totals row**: SUM formulas for all columns
+- **AutoFilter**: Enabled for sorting
+
+#### Export All Projects
+
+Export a comprehensive workbook with all projects:
+
+**API Endpoint:**
+```
+GET /api/export?type=all
+```
+
+The exported file (`month-year-all-projects.xlsx`) contains:
+
+**1. Все проекты (All Projects) sheet**
+- Summary of all projects
+- Columns: Project, Rate, Total Hours, Total Cost, # Entries, % Hours, % Cost
+- **Formulas**: Automatic calculation of totals and percentages
+- **AutoFilter**: Enabled for sorting by any metric
+
+**2. Individual project sheets**
+- One sheet per project (if it has entries)
+- Time entries with totals
+- **AutoFilter**: Enabled for easy data manipulation
+
+#### XLSX Features
+
+- **Formulas**: Dynamic calculations that update when you edit values
+- **AutoFilter**: Click column headers to sort and filter data
+- **Column widths**: Optimized for readability
+- **Professional formatting**: Ready for sharing with clients or accounting
+- **Excel/LibreOffice compatible**: Open and edit in any spreadsheet application
+
+For detailed export documentation, see [EXPORT-GUIDE.md](EXPORT-GUIDE.md).
 
 ### UX Features
 
@@ -146,7 +191,8 @@ The exported file contains two sheets:
 - React 19
 - TypeScript
 - Tailwind CSS
-- xlsx (for working with Excel)
+- better-sqlite3 (for SQLite database)
+- xlsx (for Excel export with formulas)
 - Docker (for containerization)
 
 ## Running with Docker
@@ -194,10 +240,11 @@ docker rm time-tracking
 
 - ✅ Multi-stage build for minimal image size
 - ✅ Run as unprivileged user
-- ✅ Automatic creation of `data` directory for Excel files
+- ✅ Automatic creation of `data` directory for SQLite database
 - ✅ Volume for data persistence between restarts
 - ✅ Health check for monitoring application status
 - ✅ Next.js standalone mode for optimal performance
+- ✅ SQLite3 included in container
 
 ## Troubleshooting
 
@@ -207,8 +254,8 @@ docker rm time-tracking
 - Make sure PATCH requests are not blocked by browser extensions
 - Reload the page after changing the rate
 
-**"cannot save file" error:**
+**"cannot save data" error:**
 
-- Make sure the Excel file is not open in another program
 - Check access permissions to the `data/` folder
-- If the error persists, close Excel and restart the application
+- Make sure the SQLite database file is not locked by another process
+- If the error persists, restart the application

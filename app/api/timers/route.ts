@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getActiveTimers, startTimer, updateTimer, stopTimer, deleteTimer, getTimer } from '@/lib/excel';
+import { getActiveTimers, startTimer, updateTimer, stopTimer, deleteTimer, getTimer } from '@/lib/database';
 
 export async function GET() {
   try {

@@ -5,7 +5,7 @@ FROM node:20-alpine AS base
 
 # Stage 1: Install dependencies
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
@@ -24,6 +24,9 @@ RUN npm run build
 # Stage 3: Production image
 FROM base AS runner
 WORKDIR /app
+
+# Install SQLite3 for runtime
+RUN apk add --no-cache sqlite
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

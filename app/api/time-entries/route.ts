@@ -4,7 +4,7 @@ import {
   getProjectEntries,
   saveTimeEntry,
   updateTimeEntry,
-} from "@/lib/excel";
+} from "@/lib/database";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {

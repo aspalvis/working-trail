@@ -1,22 +1,32 @@
-import { exportProjectData } from "@/lib/excel";
+import { exportProjectDataXLSX, exportAllProjectsXLSX } from "@/lib/export";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const projectName = searchParams.get("project");
+    const exportType = searchParams.get("type") || "single"; // 'single' or 'all'
 
-    if (!projectName) {
-      return NextResponse.json({ error: "Project name not specified" }, { status: 400 });
-    }
+    let buffer: Buffer;
+    let fileName: string;
 
-    const buffer = exportProjectData(projectName);
-
-    // Generate filename: month-year-project.xlsx
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const year = now.getFullYear();
-    const fileName = `${month}-${year}-${projectName}.xlsx`;
+
+    if (exportType === "all") {
+      // Export all projects
+      buffer = exportAllProjectsXLSX();
+      fileName = `${month}-${year}-all-projects.xlsx`;
+    } else {
+      // Export single project
+      if (!projectName) {
+        return NextResponse.json({ error: "Project name not specified" }, { status: 400 });
+      }
+
+      buffer = exportProjectDataXLSX(projectName);
+      fileName = `${month}-${year}-${projectName}.xlsx`;
+    }
 
     return new NextResponse(Buffer.from(buffer), {
       headers: {

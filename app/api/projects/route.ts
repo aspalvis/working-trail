@@ -1,4 +1,4 @@
-import { addProject, getProjects, updateProjectRate } from "@/lib/excel";
+import { addProject, getProjects, updateProjectRate } from "@/lib/database";
 import { NextResponse } from "next/server";
 
 export async function GET() {
