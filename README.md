@@ -1,214 +1,214 @@
-# Тайм-Трекинг
+# Time Tracking
 
-Приложение для отслеживания времени работы над проектами с сохранением данных в Excel.
+An application for tracking time spent on projects with data saved to Excel.
 
-## Возможности
+## Features
 
-- 🎨 Современный и отзывчивый UI с анимациями
-- 📁 Создание и управление проектами (+ почасовая ставка)
-- ⏱️ Секундомер для отслеживания времени (работает in-memory)
-- 💾 Автоматическое сохранение в Excel при остановке таймера
-- 📊 Для каждого проекта создается отдельный лист (sheet) в Excel
-- 💰 Автоматический расчет стоимости по ставке (часы \* ставка)
-- 🛠️ Окно "Управление проектами" для создания и изменения ставок
-- 📈 Общий лист со сводкой по всем проектам
-- 🌓 Поддержка темной темы
-- ⚡ Индикаторы загрузки и статуса сохранения
-- 🎯 Визуальная обратная связь для всех действий
+- 🎨 Modern and responsive UI with animations
+- 📁 Create and manage projects (+ hourly rate)
+- ⏱️ Stopwatch for time tracking (works in-memory)
+- 💾 Automatic saving to Excel when stopping the timer
+- 📊 Each project gets a separate sheet in Excel
+- 💰 Automatic cost calculation based on rate (hours \* rate)
+- 🛠️ "Project Management" window for creating and modifying rates
+- 📈 Summary sheet with overview of all projects
+- 🌓 Dark theme support
+- ⚡ Loading and save status indicators
+- 🎯 Visual feedback for all actions
 
-## Структура Excel файла
+## Excel File Structure
 
-Файлы автоматически создаются в папке `data/` с названием `time-tracking-ГГГГ-ММ.xlsx` (например, `data/time-tracking-2025-11.xlsx`). Для каждого месяца создается отдельный файл. Папка `data` создается автоматически при первом запуске. Каждый файл содержит:
+Files are automatically created in the `data/` folder with the name `time-tracking-YYYY-MM.xlsx` (e.g., `data/time-tracking-2025-11.xlsx`). A separate file is created for each month. The `data` folder is created automatically on first run. Each file contains:
 
-### Лист "Общий"
+### "Summary" Sheet
 
-- Колонка "Дата" - дата записи
-- Колонка "Общее время (ч)" - суммарное время за день
-- Для каждого проекта - отдельная колонка с затраченным временем
+- "Date" column - entry date
+- "Total Time (h)" column - total time per day
+- For each project - a separate column with time spent
 
-### Листы проектов
+### Project Sheets
 
-Для каждого проекта создается отдельный лист с колонками:
+A separate sheet is created for each project with columns:
 
-- Дата (формат YYYY-MM-DD, например 2025-11-20)
-- Время начала
-- Время окончания
-- Длительность (ч)
-- Описание
-- Стоимость (€)
+- Date (YYYY-MM-DD format, e.g. 2025-11-20)
+- Start Time
+- End Time
+- Duration (h)
+- Description
+- Cost (€)
 
-**Важно:** Приложение автоматически нормализует даты из старых форматов (DD.MM.YYYY) в стандартный формат ISO (YYYY-MM-DD) при чтении данных. Это обеспечивает совместимость с HTML date picker и единообразие в системе.
+**Important:** The application automatically normalizes dates from old formats (DD.MM.YYYY) to standard ISO format (YYYY-MM-DD) when reading data. This ensures compatibility with HTML date picker and consistency throughout the system.
 
-### Ставка проекта и настройки
+### Project Rate and Settings
 
-Служебный лист `_settings` теперь является универсальным key-value хранилищем с колонками:
+The service sheet `_settings` is now a universal key-value storage with columns:
 
 - Key
 - Value
 
-Проектные ставки сохраняются по ключу формата:
+Project rates are saved with a key in the format:
 
 ```
-project:<ИмяПроекта>:hourlyRateEUR
+project:<ProjectName>:hourlyRateEUR
 ```
 
-Например: `project:Website:hourlyRateEUR -> 45`.
+For example: `project:Website:hourlyRateEUR -> 45`.
 
-При первом переходе со старого формата (колонки `Project` / `HourlyRateEUR` или лист `_projectMeta`) выполняется автоматическая миграция в новый KV-формат. Ставку можно указать при создании проекта или изменить позже в модальном окне "Управление проектами". Значение хранится в евро. Если ставка не задана, используется 0.
+On first transition from the old format (columns `Project` / `HourlyRateEUR` or `_projectMeta` sheet), automatic migration to the new KV format is performed. The rate can be specified when creating a project or changed later in the "Project Management" modal. The value is stored in euros. If no rate is set, 0 is used.
 
-### Лист "Аналитика"
+### "Analytics" Sheet
 
-Автоматически формируется и обновляется при создании проектов, изменении ставок и добавлении записей времени. Содержит:
+Automatically created and updated when creating projects, changing rates, and adding time entries. Contains:
 
-- Проект — имя проекта
-- Часы (SUM) — формула `SUM('<Проект>'!D:D)` суммирует длительности
-- Ставка (€/ч) — числовое значение из `_settings`
-- Стоимость (€) — формула `ROUND(Bx*Cx,2)` (часы \* ставка)
-- % Часы — доля часов проекта от общего времени `B x / SUM(B2:Bn)`
-- % Стоимость — доля стоимости проекта `D x / SUM(D2:Dn)`
-- Итоговая строка с суммами по часам и стоимости
+- Project — project name
+- Hours (SUM) — formula `SUM('<Project>'!D:D)` sums durations
+- Rate (€/h) — numeric value from `_settings`
+- Cost (€) — formula `ROUND(Bx*Cx,2)` (hours \* rate)
+- % Hours — project hours as percentage of total time `B x / SUM(B2:Bn)`
+- % Cost — project cost as percentage `D x / SUM(D2:Dn)`
+- Total row with sums for hours and cost
 
-Технически лист создаётся в файле как `Аналитика` и может быть пересоздан повторно — ручные правки на нем не сохраняются.
+Technically, the sheet is created in the file as `Аналитика` and can be recreated — manual edits on it are not preserved.
 
-### Расчет стоимости
+### Cost Calculation
 
-При сохранении записи времени в листе проекта рассчитывается стоимость в евро: `Длительность * Ставка` (округление до 2 знаков). Старые листы с колонкой "Стоимость" без указания валюты будут переименованы в "Стоимость (€)" при следующем обновлении.
+When saving a time entry to the project sheet, the cost in euros is calculated: `Duration * Rate` (rounded to 2 decimal places). Old sheets with a "Cost" column without currency specification will be renamed to "Cost (€)" on the next update.
 
-## Установка и запуск
+## Installation and Running
 
 ```bash
-# Установка зависимостей
+# Install dependencies
 npm install
 
-# Запуск в режиме разработки
+# Run in development mode
 npm run dev
 ```
 
-Откройте [http://localhost:3000](http://localhost:3000) в браузере.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Использование
+## Usage
 
-1. При первом запуске создайте проект, нажав "Управление проектами" (при желании сразу задайте ставку)
-2. Выберите проект из списка (проекты отображаются с иконками; ставка видна под названием)
-3. Нажмите "Старт" для начала отсчета времени
-   - Таймер работает в памяти и не создает нагрузку на диск
-   - Визуальная индикация работающего таймера (пульсирующий эффект)
-4. Нажмите "Стоп" для остановки и автоматического сохранения в Excel
-   - Появится индикатор сохранения
-   - Данные сохраняются только при остановке
-5. Для смены проекта нажмите "Сменить проект"
-6. Чтобы изменить ставку проекта, откройте "Управление проектами" и внесите изменения в соответствующее поле
+1. On first run, create a project by clicking "Project Management" (optionally set the rate right away)
+2. Select a project from the list (projects are displayed with icons; rate is visible under the name)
+3. Click "Start" to begin tracking time
+   - Timer works in memory and doesn't create disk load
+   - Visual indication of running timer (pulsing effect)
+4. Click "Stop" to stop and automatically save to Excel
+   - A save indicator will appear
+   - Data is saved only on stop
+5. To change project, click "Change Project"
+6. To change project rate, open "Project Management" and modify the corresponding field
 
-### Просмотр и редактирование записей
+### Viewing and Editing Entries
 
-Страница "Редактировать записи" (`/time-entries`) позволяет:
+The "Edit Entries" page (`/time-entries`) allows you to:
 
-- Просматривать все записи времени за текущий месяц
-- Фильтровать записи по проекту
-- Видеть общую статистику (часы и стоимость)
-- Редактировать существующие записи (дата, время, длительность)
-- Удалять записи
-- Экспортировать данные выбранного проекта
+- View all time entries for the current month
+- Filter entries by project
+- See overall statistics (hours and cost)
+- Edit existing entries (date, time, duration)
+- Delete entries
+- Export data for selected project
 
-### Экспорт данных проекта
+### Exporting Project Data
 
-Для каждого проекта доступна функция экспорта в отдельный XLSX файл:
+For each project, an export function to a separate XLSX file is available:
 
-**Из "Управление проектами":**
+**From "Project Management":**
 
-1. Откройте "Управление проектами"
-2. Нажмите кнопку "Экспорт" рядом с нужным проектом
+1. Open "Project Management"
+2. Click the "Export" button next to the desired project
 
-**Со страницы "Редактировать записи":**
+**From the "Edit Entries" page:**
 
-1. Перейдите на страницу "Редактировать записи"
-2. Выберите проект в фильтре
-3. Нажмите кнопку "Экспорт [название проекта]"
+1. Go to the "Edit Entries" page
+2. Select a project in the filter
+3. Click the "Export [project name]" button
 
-Файл будет скачан с названием в формате: `месяц-год-проект.xlsx` (например, `11-2025-Website.xlsx`)
+The file will be downloaded with a name in the format: `month-year-project.xlsx` (e.g., `11-2025-Website.xlsx`)
 
-Экспортируемый файл содержит два листа:
+The exported file contains two sheets:
 
-- **Записи времени** — все записи времени для выбранного проекта с колонками: Дата, Время начала, Время окончания, Длительность (ч), Описание, Стоимость (€)
-- **Аналитика** — сводная информация: общее количество часов, ставка, итоговая стоимость, количество записей и период работы
+- **Time Entries** — all time entries for the selected project with columns: Date, Start Time, End Time, Duration (h), Description, Cost (€)
+- **Analytics** — summary information: total hours, rate, total cost, number of entries, and work period
 
-### Особенности UX
+### UX Features
 
-- Плавные анимации при переходах между экранами
-- Индикаторы загрузки для всех асинхронных операций
-- Визуальная обратная связь для кнопок (hover, active состояния)
-- Информативные сообщения об ошибках
-- Адаптивный дизайн для разных размеров экрана
+- Smooth animations during screen transitions
+- Loading indicators for all asynchronous operations
+- Visual feedback for buttons (hover, active states)
+- Informative error messages
+- Responsive design for different screen sizes
 
-## Технологии
+## Technologies
 
 - Next.js 16
 - React 19
 - TypeScript
 - Tailwind CSS
-- xlsx (для работы с Excel)
-- Docker (для контейнеризации)
+- xlsx (for working with Excel)
+- Docker (for containerization)
 
-## Запуск с Docker
+## Running with Docker
 
-### Использование Docker Compose (рекомендуется)
+### Using Docker Compose (recommended)
 
 ```bash
-# Сборка и запуск
+# Build and run
 docker-compose up -d
 
-# Просмотр логов
+# View logs
 docker-compose logs -f
 
-# Остановка
+# Stop
 docker-compose down
 
-# Перезапуск после изменений
+# Restart after changes
 docker-compose up -d --build
 ```
 
-Приложение будет доступно на [http://localhost:3000](http://localhost:3000)
+The application will be available at [http://localhost:3000](http://localhost:3000)
 
-### Использование Docker напрямую
+### Using Docker directly
 
 ```bash
-# Сборка образа
+# Build image
 docker build -t time-tracking-app .
 
-# Запуск контейнера
+# Run container
 docker run -d \
   -p 3000:3000 \
   -v $(pwd)/data:/app/data \
   --name time-tracking \
   time-tracking-app
 
-# Просмотр логов
+# View logs
 docker logs -f time-tracking
 
-# Остановка и удаление
+# Stop and remove
 docker stop time-tracking
 docker rm time-tracking
 ```
 
-### Особенности Docker версии
+### Docker Version Features
 
-- ✅ Multi-stage сборка для минимального размера образа
-- ✅ Запуск от имени непривилегированного пользователя
-- ✅ Автоматическое создание директории `data` для Excel файлов
-- ✅ Volume для персистентности данных между перезапусками
-- ✅ Health check для мониторинга состояния приложения
-- ✅ Standalone режим Next.js для оптимальной производительности
+- ✅ Multi-stage build for minimal image size
+- ✅ Run as unprivileged user
+- ✅ Automatic creation of `data` directory for Excel files
+- ✅ Volume for data persistence between restarts
+- ✅ Health check for monitoring application status
+- ✅ Next.js standalone mode for optimal performance
 
-## Решение проблем
+## Troubleshooting
 
-**Ставка не обновляется:**
+**Rate not updating:**
 
-- Проверьте, что вводите неотрицательное число
-- Убедитесь, что запрос PATCH не блокируется расширениями браузера
-- Перезагрузите страницу после изменения ставки
+- Check that you're entering a non-negative number
+- Make sure PATCH requests are not blocked by browser extensions
+- Reload the page after changing the rate
 
-**Ошибка "cannot save file":**
+**"cannot save file" error:**
 
-- Убедитесь, что Excel файл не открыт в другой программе
-- Проверьте права доступа к папке `data/`
-- Если ошибка повторяется, закройте Excel и перезапустите приложение
+- Make sure the Excel file is not open in another program
+- Check access permissions to the `data/` folder
+- If the error persists, close Excel and restart the application

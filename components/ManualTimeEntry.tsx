@@ -42,7 +42,7 @@ export default function ManualTimeEntry({ onClose, onSaved }: ManualTimeEntryPro
       }
     } catch (error) {
       console.error("Failed to load projects:", error);
-      setError("Не удалось загрузить проекты");
+      setError("Failed to load projects");
     } finally {
       setIsLoading(false);
     }
@@ -70,18 +70,18 @@ export default function ManualTimeEntry({ onClose, onSaved }: ManualTimeEntryPro
     setError("");
 
     if (!selectedProject) {
-      setError("Выберите проект");
+      setError("Select a project");
       return;
     }
 
     if (!date || !startTime || !endTime) {
-      setError("Заполните все обязательные поля");
+      setError("Fill in all required fields");
       return;
     }
 
     const duration = calculateDuration();
     if (duration <= 0) {
-      setError("Время окончания должно быть позже времени начала");
+      setError("End time must be later than start time");
       return;
     }
 
@@ -110,7 +110,7 @@ export default function ManualTimeEntry({ onClose, onSaved }: ManualTimeEntryPro
       onClose();
     } catch (error) {
       console.error("Error saving time entry:", error);
-      setError("Ошибка при сохранении. Убедитесь, что файл Excel не открыт.");
+      setError("Error saving. Make sure the Excel file is not open.");
     } finally {
       setIsSaving(false);
     }
@@ -124,7 +124,7 @@ export default function ManualTimeEntry({ onClose, onSaved }: ManualTimeEntryPro
       <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-indigo-200/50 dark:border-indigo-800/50 max-w-2xl w-full animate-slide-in max-h-[90vh] overflow-hidden flex flex-col">
         <div className="p-6 md:p-10 overflow-y-auto">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">Добавить запись времени</h2>
+            <h2 className="text-2xl font-bold">Add Time Entry</h2>
             <button
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
@@ -173,12 +173,12 @@ export default function ManualTimeEntry({ onClose, onSaved }: ManualTimeEntryPro
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">Сначала создайте проект</p>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">Create a project first</p>
               <button
                 onClick={onClose}
                 className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
               >
-                Закрыть
+                Close
               </button>
             </div>
           ) : (
@@ -186,7 +186,7 @@ export default function ManualTimeEntry({ onClose, onSaved }: ManualTimeEntryPro
               {/* Project Selection */}
               <div>
                 <label className="block text-sm font-semibold mb-2">
-                  Проект <span className="text-red-500">*</span>
+                  Project <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={selectedProject}
@@ -201,7 +201,7 @@ export default function ManualTimeEntry({ onClose, onSaved }: ManualTimeEntryPro
                 >
                   {projects.map((project) => (
                     <option key={project.name} value={project.name}>
-                      {project.name} (ставка {project.hourlyRate.toFixed(2)})
+                      {project.name} (rate {project.hourlyRate.toFixed(2)})
                     </option>
                   ))}
                 </select>
@@ -210,7 +210,7 @@ export default function ManualTimeEntry({ onClose, onSaved }: ManualTimeEntryPro
               {/* Date */}
               <div>
                 <label className="block text-sm font-semibold mb-2">
-                  Дата <span className="text-red-500">*</span>
+                  Date <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
@@ -226,7 +226,7 @@ export default function ManualTimeEntry({ onClose, onSaved }: ManualTimeEntryPro
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold mb-2">
-                    Время начала <span className="text-red-500">*</span>
+                    Start Time <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="time"
@@ -239,7 +239,7 @@ export default function ManualTimeEntry({ onClose, onSaved }: ManualTimeEntryPro
                 </div>
                 <div>
                   <label className="block text-sm font-semibold mb-2">
-                    Время окончания <span className="text-red-500">*</span>
+                    End Time <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="time"
@@ -256,15 +256,15 @@ export default function ManualTimeEntry({ onClose, onSaved }: ManualTimeEntryPro
               <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">
-                    Длительность:
+                    Duration:
                   </span>
                   <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                    {duration.toFixed(2)} ч
+                    {duration.toFixed(2)} h
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">
-                    Стоимость (€ @ {selectedRate.toFixed(2)}):
+                    Cost (€ @ {selectedRate.toFixed(2)}):
                   </span>
                   <span className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                     {cost.toFixed(2)} €
@@ -274,13 +274,13 @@ export default function ManualTimeEntry({ onClose, onSaved }: ManualTimeEntryPro
 
               {/* Description (optional) */}
               <div>
-                <label className="block text-sm font-semibold mb-2">Описание (опционально)</label>
+                <label className="block text-sm font-semibold mb-2">Description (optional)</label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={3}
                   className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 outline-none transition-all resize-none"
-                  placeholder="Введите описание работы..."
+                  placeholder="Enter work description..."
                   disabled={isSaving}
                 />
               </div>

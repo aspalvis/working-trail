@@ -139,14 +139,14 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
       setStartTime(null);
     } catch (error) {
       console.error("Error saving time entry:", error);
-      alert("Ошибка при сохранении времени. Убедитесь, что файл Excel не открыт.");
+      alert("Error saving time. Make sure the Excel file is not open.");
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm("Вы уверены, что хотите удалить этот таймер?")) {
+    if (!confirm("Are you sure you want to delete this timer?")) {
       return;
     }
 
@@ -163,7 +163,7 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
       onDelete();
     } catch (error) {
       console.error("Error deleting timer:", error);
-      alert("Ошибка при удалении таймера.");
+      alert("Error deleting timer.");
     }
   };
 
@@ -183,7 +183,7 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
         onClick={handleDelete}
         disabled={isRunning || isSaving}
         className="absolute top-5 right-5 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-        title="Удалить таймер"
+        title="Delete timer"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -217,7 +217,7 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
           <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
             <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm font-medium">
               <div className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></div>
-              <span>Идет запись</span>
+              <span>Recording</span>
             </div>
           </div>
         )}
@@ -245,7 +245,7 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
                   d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              Старт
+              Start
             </span>
           </button>
         ) : (
@@ -272,7 +272,7 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  Сохранение...
+                  Saving...
                 </>
               ) : (
                 <>
@@ -290,7 +290,7 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
                       d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
                     />
                   </svg>
-                  Стоп
+                  Stop
                 </>
               )}
             </span>
@@ -301,16 +301,14 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
       {!isRunning && elapsedTime === 0 && !isSaving && (
         <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <p className="text-blue-700 dark:text-blue-300 text-sm">
-            💡 Нажмите "Старт" чтобы начать отслеживание времени
+            💡 Click "Start" to begin time tracking
           </p>
         </div>
       )}
 
       {isSaving && (
         <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-          <p className="text-yellow-700 dark:text-yellow-300 text-sm">
-            ⏳ Сохранение данных в Excel...
-          </p>
+          <p className="text-yellow-700 dark:text-yellow-300 text-sm">⏳ Saving data to Excel...</p>
         </div>
       )}
     </div>

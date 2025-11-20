@@ -48,7 +48,7 @@ function writeWorkbook(workbook: XLSX.WorkBook, filePath: string) {
     fs.writeFileSync(filePath, buffer);
   } catch (error: any) {
     if (error.code === "EBUSY" || error.code === "EPERM") {
-      throw new Error("Файл Excel открыт в другой программе. Закройте файл и попробуйте снова.");
+      throw new Error("Excel file is open in another program. Close the file and try again.");
     }
     throw error;
   }
@@ -60,10 +60,10 @@ function readWorkbook(filePath: string): XLSX.WorkBook {
     return XLSX.read(buffer, { type: "buffer" });
   } catch (error: any) {
     if (error.code === "EBUSY" || error.code === "EPERM") {
-      throw new Error("Файл Excel открыт в другой программе. Закройте файл и попробуйте снова.");
+      throw new Error("Excel file is open in another program. Close the file and try again.");
     }
     if (error.code === "ENOENT") {
-      throw new Error("Файл Excel не найден.");
+      throw new Error("Excel file not found.");
     }
     throw error;
   }
@@ -705,7 +705,7 @@ export function exportProjectData(projectName: string): Buffer {
   const workbook = readWorkbook(excelFilePath);
 
   if (!workbook.SheetNames.includes(projectName)) {
-    throw new Error("Проект не найден");
+    throw new Error("Project not found");
   }
 
   // Create new workbook for export
@@ -715,7 +715,7 @@ export function exportProjectData(projectName: string): Buffer {
   const projectSheet = workbook.Sheets[projectName];
   const projectData: any[][] = XLSX.utils.sheet_to_json(projectSheet, { header: 1 });
   const entriesSheet = XLSX.utils.aoa_to_sheet(projectData);
-  XLSX.utils.book_append_sheet(exportWorkbook, entriesSheet, "Записи времени");
+  XLSX.utils.book_append_sheet(exportWorkbook, entriesSheet, "Time Entries");
 
   // 2. Create analytics sheet for this project only
   const hourlyRate = getHourlyRate(projectName, workbook);
@@ -725,19 +725,19 @@ export function exportProjectData(projectName: string): Buffer {
   const totalCost = parseFloat((totalHours * hourlyRate).toFixed(2));
 
   const analyticsRows: any[][] = [
-    ["Проект", "Часов", "Ставка (€/ч)", "Стоимость (€)"],
+    ["Project", "Hours", "Rate (€/h)", "Cost (€)"],
     [projectName, totalHours, hourlyRate, totalCost],
     [],
-    ["Всего записей", entries.length],
+    ["Total Entries", entries.length],
     [
-      "Период",
+      "Period",
       entries.length > 0 ? `${entries[entries.length - 1].date} — ${entries[0].date}` : "—",
     ],
   ];
 
   const analyticsSheet = XLSX.utils.aoa_to_sheet(analyticsRows);
   (analyticsSheet as any)["!cols"] = [{ wch: 28 }, { wch: 14 }, { wch: 14 }, { wch: 16 }];
-  XLSX.utils.book_append_sheet(exportWorkbook, analyticsSheet, "Аналитика");
+  XLSX.utils.book_append_sheet(exportWorkbook, analyticsSheet, "Analytics");
 
   // Write to buffer
   const buffer = XLSX.write(exportWorkbook, { type: "buffer", bookType: "xlsx" });

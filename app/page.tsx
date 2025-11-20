@@ -66,10 +66,10 @@ export default function Home() {
         {/* Заголовок */}
         <div className="text-center mb-12 animate-fade-in">
           <h1 className="text-5xl md:text-6xl font-bold mb-3 bg-linear-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            Тайм-Трекинг
+            Time Tracking
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-400 font-medium">
-            Отслеживайте время работы над проектами
+            Track time spent on projects
           </p>
         </div>
 
@@ -87,7 +87,7 @@ export default function Home() {
                 d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            Добавить таймер
+            Add Timer
           </button>
           <button
             onClick={() => setShowManualEntry(true)}
@@ -101,7 +101,7 @@ export default function Home() {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            Добавить запись вручную
+            Add Manual Entry
           </button>
           <button
             onClick={() => setShowProjectManager(true)}
@@ -115,7 +115,7 @@ export default function Home() {
                 d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
               />
             </svg>
-            Управление проектами
+            Project Management
           </button>
           <Link
             href="/time-entries"
@@ -129,7 +129,7 @@ export default function Home() {
                 d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
               />
             </svg>
-            Редактировать записи
+            Edit Entries
           </Link>
         </div>
 
@@ -138,7 +138,7 @@ export default function Home() {
           <div className="fixed inset-0 bg-linear-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-3xl shadow-2xl p-6 md:p-10 border border-indigo-200/50 dark:border-indigo-800/50 max-w-md w-full animate-slide-in">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold">Выберите проект</h2>
+                <h2 className="text-2xl font-bold">Select Project</h2>
                 <button
                   onClick={() => setShowProjectSelector(false)}
                   className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
@@ -193,10 +193,10 @@ export default function Home() {
                 </svg>
               </div>
               <p className="text-gray-600 dark:text-gray-400 text-xl font-medium mb-2">
-                Нет активных таймеров
+                No Active Timers
               </p>
               <p className="text-gray-500 dark:text-gray-500 text-sm">
-                Нажмите "Добавить таймер" чтобы начать
+                Click "Add Timer" to get started
               </p>
             </div>
           </div>
@@ -232,7 +232,7 @@ export default function Home() {
               />
             </svg>
             <span>
-              Автосохранение в data/time-tracking-{new Date().getFullYear()}-
+              Auto-save to data/time-tracking-{new Date().getFullYear()}-
               {String(new Date().getMonth() + 1).padStart(2, "0")}.xlsx
             </span>
           </div>

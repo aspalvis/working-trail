@@ -7,12 +7,12 @@ export async function GET(request: NextRequest) {
     const projectName = searchParams.get("project");
 
     if (!projectName) {
-      return NextResponse.json({ error: "Не указано имя проекта" }, { status: 400 });
+      return NextResponse.json({ error: "Project name not specified" }, { status: 400 });
     }
 
     const buffer = exportProjectData(projectName);
 
-    // Generate filename: месяц-год-проект.xlsx
+    // Generate filename: month-year-project.xlsx
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const year = now.getFullYear();
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Error exporting project:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Ошибка экспорта проекта" },
+      { error: error instanceof Error ? error.message : "Error exporting project" },
       { status: 500 }
     );
   }

@@ -92,7 +92,7 @@ export default function ProjectSelector({
   return (
     <div className="w-full max-w-md">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Проекты</h2>
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Projects</h2>
         {isLoading && (
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
@@ -110,7 +110,7 @@ export default function ProjectSelector({
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               ></path>
             </svg>
-            Загрузка...
+            Loading...
           </div>
         )}
       </div>
@@ -174,7 +174,7 @@ export default function ProjectSelector({
                 )}
               </div>
               <div className="mt-2 text-xs text-indigo-50/90 group-hover:text-white">
-                Ставка: {project.hourlyRate.toFixed(2)} €/ч
+                Rate: {project.hourlyRate.toFixed(2)} €/h
               </div>
             </button>
           ))}
@@ -196,8 +196,8 @@ export default function ProjectSelector({
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
-          <p className="text-gray-600 dark:text-gray-400">Нет проектов</p>
-          <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">Создайте первый проект</p>
+          <p className="text-gray-600 dark:text-gray-400">No projects</p>
+          <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">Create your first project</p>
         </div>
       )}
 
@@ -220,7 +220,7 @@ export default function ProjectSelector({
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            Добавить проект
+            Add Project
           </div>
         </button>
       ) : (
@@ -230,7 +230,7 @@ export default function ProjectSelector({
             value={newProjectName}
             onChange={(e) => setNewProjectName(e.target.value)}
             onKeyPress={(e) => e.key === "Enter" && !isSubmitting && handleAddProject()}
-            placeholder="Название проекта"
+            placeholder="Project name"
             className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 outline-none transition-all"
             autoFocus
             disabled={isSubmitting}
@@ -242,7 +242,7 @@ export default function ProjectSelector({
             value={newProjectRate}
             onChange={(e) => setNewProjectRate(e.target.value)}
             onKeyPress={(e) => e.key === "Enter" && !isSubmitting && handleAddProject()}
-            placeholder="Ставка (руб/ч)"
+            placeholder="Rate (€/h)"
             className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 outline-none transition-all"
             disabled={isSubmitting}
           />
@@ -284,7 +284,7 @@ export default function ProjectSelector({
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  Создание...
+                  Creating...
                 </>
               ) : (
                 <>
@@ -296,7 +296,7 @@ export default function ProjectSelector({
                       d="M5 13l4 4L19 7"
                     />
                   </svg>
-                  Добавить
+                  Add
                 </>
               )}
             </button>
@@ -317,7 +317,7 @@ export default function ProjectSelector({
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
-              Отмена
+              Cancel
             </button>
           </div>
         </div>

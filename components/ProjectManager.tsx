@@ -123,7 +123,7 @@ export default function ProjectManager({ onClose, onProjectCreated }: ProjectMan
       <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-indigo-200/50 dark:border-indigo-800/50 max-w-3xl w-full animate-slide-in max-h-[90vh] overflow-hidden flex flex-col">
         <div className="p-6 md:p-10 overflow-y-auto">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">Управление проектами</h2>
+            <h2 className="text-2xl font-bold">Project Management</h2>
             <button
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
@@ -142,14 +142,14 @@ export default function ProjectManager({ onClose, onProjectCreated }: ProjectMan
           {/* Create form */}
           <div className="mb-8 p-5 rounded-xl border-2 border-dashed border-indigo-300 dark:border-indigo-700 bg-indigo-50/40 dark:bg-indigo-900/10">
             <h3 className="font-semibold mb-4 text-indigo-700 dark:text-indigo-300">
-              Создать новый проект
+              Create New Project
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="Название"
+                placeholder="Name"
                 className="p-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 outline-none transition"
                 disabled={savingNew}
               />
@@ -159,7 +159,7 @@ export default function ProjectManager({ onClose, onProjectCreated }: ProjectMan
                 step="0.01"
                 value={newRate}
                 onChange={(e) => setNewRate(e.target.value)}
-                placeholder="Ставка €/ч"
+                placeholder="Rate €/h"
                 className="p-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 outline-none transition"
                 disabled={savingNew}
               />
@@ -168,7 +168,7 @@ export default function ProjectManager({ onClose, onProjectCreated }: ProjectMan
                 disabled={savingNew}
                 className="p-3 bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-semibold shadow hover:shadow-lg transition disabled:opacity-50"
               >
-                {savingNew ? "Создание..." : "Создать"}
+                {savingNew ? "Creating..." : "Create"}
               </button>
             </div>
           </div>
@@ -209,13 +209,13 @@ export default function ProjectManager({ onClose, onProjectCreated }: ProjectMan
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                Загрузка...
+                Loading...
               </div>
             ) : projects.length === 0 ? (
               <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 text-center">
-                <p className="text-gray-600 dark:text-gray-400">Нет проектов</p>
+                <p className="text-gray-600 dark:text-gray-400">No projects</p>
                 <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
-                  Создайте первый проект выше
+                  Create your first project above
                 </p>
               </div>
             ) : (
@@ -230,12 +230,12 @@ export default function ProjectManager({ onClose, onProjectCreated }: ProjectMan
                         <span>{p.name}</span>
                         {editingProject?.name === p.name && (
                           <span className="text-xs px-2 py-1 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300">
-                            Редактирование
+                            Editing
                           </span>
                         )}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Текущая ставка: {p.hourlyRate.toFixed(2)} €/ч
+                        Current rate: {p.hourlyRate.toFixed(2)} €/h
                       </div>
                     </div>
                     {editingProject?.name === p.name ? (
@@ -254,14 +254,14 @@ export default function ProjectManager({ onClose, onProjectCreated }: ProjectMan
                           disabled={savingEdit}
                           className="px-4 py-2 bg-linear-to-r from-green-500 to-green-600 text-white rounded-lg text-sm font-semibold shadow hover:shadow-lg transition disabled:opacity-50"
                         >
-                          {savingEdit ? "Сохранение..." : "Сохранить"}
+                          {savingEdit ? "Saving..." : "Save"}
                         </button>
                         <button
                           onClick={cancelEdit}
                           disabled={savingEdit}
                           className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition"
                         >
-                          Отмена
+                          Cancel
                         </button>
                       </div>
                     ) : (
@@ -286,13 +286,13 @@ export default function ProjectManager({ onClose, onProjectCreated }: ProjectMan
                               d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                             />
                           </svg>
-                          Экспорт
+                          Export
                         </button>
                         <button
                           onClick={() => beginEdit(p)}
                           className="px-4 py-2 bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold shadow hover:shadow-lg transition"
                         >
-                          Изменить ставку (€)
+                          Change Rate (€)
                         </button>
                       </div>
                     )}
