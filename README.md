@@ -147,6 +147,57 @@ npm run dev
 - TypeScript
 - Tailwind CSS
 - xlsx (для работы с Excel)
+- Docker (для контейнеризации)
+
+## Запуск с Docker
+
+### Использование Docker Compose (рекомендуется)
+
+```bash
+# Сборка и запуск
+docker-compose up -d
+
+# Просмотр логов
+docker-compose logs -f
+
+# Остановка
+docker-compose down
+
+# Перезапуск после изменений
+docker-compose up -d --build
+```
+
+Приложение будет доступно на [http://localhost:3000](http://localhost:3000)
+
+### Использование Docker напрямую
+
+```bash
+# Сборка образа
+docker build -t time-tracking-app .
+
+# Запуск контейнера
+docker run -d \
+  -p 3000:3000 \
+  -v $(pwd)/data:/app/data \
+  --name time-tracking \
+  time-tracking-app
+
+# Просмотр логов
+docker logs -f time-tracking
+
+# Остановка и удаление
+docker stop time-tracking
+docker rm time-tracking
+```
+
+### Особенности Docker версии
+
+- ✅ Multi-stage сборка для минимального размера образа
+- ✅ Запуск от имени непривилегированного пользователя
+- ✅ Автоматическое создание директории `data` для Excel файлов
+- ✅ Volume для персистентности данных между перезапусками
+- ✅ Health check для мониторинга состояния приложения
+- ✅ Standalone режим Next.js для оптимальной производительности
 
 ## Решение проблем
 
