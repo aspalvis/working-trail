@@ -1,6 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { formatDate } from "@/lib/constants";
+import { useEffect, useRef, useState } from "react";
 
 interface TimerProps {
   timerId: string;
@@ -39,17 +40,17 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
     if (isRunning) {
       updateIntervalRef.current = setInterval(async () => {
         try {
-          await fetch('/api/timers', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+          await fetch("/api/timers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              action: 'update',
+              action: "update",
               timerId,
-              elapsedTime
-            })
+              elapsedTime,
+            }),
           });
         } catch (error) {
-          console.error('Error updating timer on server:', error);
+          console.error("Error updating timer on server:", error);
         }
       }, 5000);
     } else {
@@ -71,17 +72,17 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
     setElapsedTime(0);
 
     try {
-      await fetch('/api/timers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      await fetch("/api/timers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: 'start',
+          action: "start",
           timerId,
-          project
-        })
+          project,
+        }),
       });
     } catch (error) {
-      console.error('Error starting timer on server:', error);
+      console.error("Error starting timer on server:", error);
     }
   };
 
@@ -93,13 +94,13 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
     setIsSaving(true);
 
     try {
-      await fetch('/api/timers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      await fetch("/api/timers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: 'stop',
-          timerId
-        })
+          action: "stop",
+          timerId,
+        }),
       });
 
       const endTime = new Date();
@@ -107,29 +108,29 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
 
       const entry = {
         project,
-        date: startTime.toLocaleDateString('ru-RU'),
-        startTime: startTime.toLocaleTimeString('ru-RU'),
-        endTime: endTime.toLocaleTimeString('ru-RU'),
+        date: formatDate(startTime),
+        startTime: startTime.toLocaleTimeString("ru-RU"),
+        endTime: endTime.toLocaleTimeString("ru-RU"),
         duration: parseFloat(durationInHours.toFixed(4)),
       };
 
-      const response = await fetch('/api/time-entries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/time-entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(entry),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save time entry');
+        throw new Error("Failed to save time entry");
       }
 
-      await fetch('/api/timers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      await fetch("/api/timers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: 'delete',
-          timerId
-        })
+          action: "delete",
+          timerId,
+        }),
       });
 
       onTimeSaved();
@@ -137,32 +138,32 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
       setElapsedTime(0);
       setStartTime(null);
     } catch (error) {
-      console.error('Error saving time entry:', error);
-      alert('Ошибка при сохранении времени. Убедитесь, что файл Excel не открыт.');
+      console.error("Error saving time entry:", error);
+      alert("Ошибка при сохранении времени. Убедитесь, что файл Excel не открыт.");
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm('Вы уверены, что хотите удалить этот таймер?')) {
+    if (!confirm("Вы уверены, что хотите удалить этот таймер?")) {
       return;
     }
 
     try {
-      await fetch('/api/timers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      await fetch("/api/timers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: 'delete',
-          timerId
-        })
+          action: "delete",
+          timerId,
+        }),
       });
 
       onDelete();
     } catch (error) {
-      console.error('Error deleting timer:', error);
-      alert('Ошибка при удалении таймера.');
+      console.error("Error deleting timer:", error);
+      alert("Ошибка при удалении таймера.");
     }
   };
 
@@ -171,27 +172,32 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
 
-    return `${hours.toString().padStart(2, '0')}:${minutes
+    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs
       .toString()
-      .padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      .padStart(2, "0")}`;
   };
 
   return (
-    <div className="w-full text-center relative border-2 border-gray-200 dark:border-gray-700 rounded-2xl p-6 bg-white dark:bg-gray-800 shadow-lg">
+    <div className="w-full text-center relative border border-gray-200/50 dark:border-gray-700/50 rounded-3xl p-8 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300 animate-fade-in">
       <button
         onClick={handleDelete}
         disabled={isRunning || isSaving}
-        className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        className="absolute top-5 right-5 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
         title="Удалить таймер"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
         </svg>
       </button>
 
-      <div className="mb-6">
-        <div className="inline-block px-4 py-2 bg-indigo-100 dark:bg-indigo-900 rounded-full">
-          <h2 className="text-lg font-semibold text-indigo-900 dark:text-indigo-100">
+      <div className="mb-8">
+        <div className="inline-block px-6 py-2.5 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-full border border-indigo-200/50 dark:border-indigo-700/50">
+          <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
             {project}
           </h2>
         </div>
@@ -199,10 +205,10 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
 
       <div className="relative mb-10">
         <div
-          className={`text-7xl md:text-8xl font-mono font-bold transition-all duration-300 ${
+          className={`text-5xl md:text-6xl font-mono font-bold transition-all duration-300 ${
             isRunning
-              ? 'text-green-600 dark:text-green-400 animate-pulse'
-              : 'text-gray-700 dark:text-gray-300'
+              ? "text-green-600 dark:text-green-400 animate-pulse"
+              : "text-gray-700 dark:text-gray-300"
           }`}
         >
           {formatTime(elapsedTime)}
@@ -226,8 +232,18 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
           >
             <span className="flex items-center gap-2">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               Старт
             </span>
@@ -242,16 +258,37 @@ export default function Timer({ timerId, project, onTimeSaved, onDelete }: Timer
               {isSaving ? (
                 <>
                   <svg className="animate-spin w-6 h-6" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
                   </svg>
                   Сохранение...
                 </>
               ) : (
                 <>
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
+                    />
                   </svg>
                   Стоп
                 </>

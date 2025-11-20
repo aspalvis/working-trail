@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as XLSX from "xlsx";
+import { normalizeDateString } from "./constants";
 
 const MAIN_SHEET_NAME = "Общий";
 const TIMERS_SHEET_NAME = "_timers";
@@ -193,7 +194,7 @@ export function getProjects(): ProjectWithRate[] {
   const excelFilePath = getExcelFilePath();
   const workbook = readWorkbook(excelFilePath);
   const projectNames = workbook.SheetNames.filter(
-    (name) => name !== MAIN_SHEET_NAME && !name.startsWith("_")
+    (name) => name !== MAIN_SHEET_NAME && !name.startsWith("_") && name !== ANALYTICS_SHEET_NAME
   );
   return projectNames.map((name) => ({ name, hourlyRate: getHourlyRate(name, workbook) }));
 }
@@ -322,14 +323,14 @@ export function getProjectEntries(projectName: string): TimeEntryWithCost[] {
   const header = data[0] || [];
   let costIndex = header.indexOf("Стоимость (€)");
   if (costIndex === -1) costIndex = header.indexOf("Стоимость");
-  return data.slice(1).map((row) => {
+  return data.slice(1).map((row, idx) => {
     const duration = parseFloat(row[3] || "0");
     const cost =
       costIndex !== -1
         ? parseFloat(row[costIndex] || "0")
         : parseFloat((duration * hourlyRate).toFixed(2));
     return {
-      date: row[0] || "",
+      date: normalizeDateString(row[0] || ""),
       startTime: row[1] || "",
       endTime: row[2] || "",
       duration,
@@ -338,6 +339,151 @@ export function getProjectEntries(projectName: string): TimeEntryWithCost[] {
       hourlyRate,
     };
   });
+}
+
+export interface TimeEntryWithId extends TimeEntryWithCost {
+  id: string; // unique identifier: project:date:startTime:endTime
+}
+
+export function getAllTimeEntries(): TimeEntryWithId[] {
+  initializeExcelFile();
+  const excelFilePath = getExcelFilePath();
+  const workbook = readWorkbook(excelFilePath);
+  const projectNames = workbook.SheetNames.filter(
+    (name) => name !== MAIN_SHEET_NAME && !name.startsWith("_") && name !== ANALYTICS_SHEET_NAME
+  );
+  const allEntries: TimeEntryWithId[] = [];
+  for (const projectName of projectNames) {
+    const entries = getProjectEntries(projectName);
+    entries.forEach((entry) => {
+      allEntries.push({
+        ...entry,
+        id: `${entry.project}|${entry.date}|${entry.startTime}|${entry.endTime}`,
+      });
+    });
+  }
+  return allEntries.sort((a, b) => {
+    const dateCompare = b.date.localeCompare(a.date);
+    if (dateCompare !== 0) return dateCompare;
+    return b.startTime.localeCompare(a.startTime);
+  });
+}
+
+export function updateTimeEntry(id: string, updatedEntry: Partial<TimeEntry>) {
+  try {
+    initializeExcelFile();
+    const excelFilePath = getExcelFilePath();
+    const workbook = readWorkbook(excelFilePath);
+    const parts = id.split("|");
+    if (parts.length !== 4) throw new Error("Invalid entry ID");
+    const project = parts[0];
+    const date = parts[1];
+    const startTime = parts[2];
+    const endTime = parts[3];
+    if (!workbook.SheetNames.includes(project)) {
+      throw new Error("Project not found");
+    }
+    const sheet = workbook.Sheets[project];
+    const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    const header = data[0] || [];
+    let costIndex = header.indexOf("Стоимость (€)");
+    if (costIndex === -1) costIndex = header.indexOf("Стоимость");
+    const normalizedDate = normalizeDateString(date);
+    const rowIdx = data.findIndex(
+      (row, idx) =>
+        idx > 0 &&
+        normalizeDateString(row[0] || "") === normalizedDate &&
+        row[1] === startTime &&
+        row[2] === endTime
+    );
+    if (rowIdx === -1) throw new Error("Entry not found");
+    const oldDuration = parseFloat(data[rowIdx][3] || "0");
+    // Update fields
+    if (updatedEntry.date !== undefined) data[rowIdx][0] = updatedEntry.date;
+    if (updatedEntry.startTime !== undefined) data[rowIdx][1] = updatedEntry.startTime;
+    if (updatedEntry.endTime !== undefined) data[rowIdx][2] = updatedEntry.endTime;
+    if (updatedEntry.duration !== undefined) data[rowIdx][3] = updatedEntry.duration;
+    const newDuration = parseFloat(data[rowIdx][3] || "0");
+    const hourlyRate = getHourlyRate(project, workbook);
+    const newCost = parseFloat((newDuration * hourlyRate).toFixed(2));
+    if (costIndex !== -1) data[rowIdx][costIndex] = newCost;
+    workbook.Sheets[project] = XLSX.utils.aoa_to_sheet(data);
+    // Update main sheet: subtract old duration, add new
+    const mainSheet = workbook.Sheets[MAIN_SHEET_NAME];
+    const mainData: any[][] = XLSX.utils.sheet_to_json(mainSheet, { header: 1 });
+    const mainHeader = mainData[0];
+    const projectIndex = mainHeader.indexOf(project);
+    if (projectIndex !== -1) {
+      const oldDateRow = mainData.findIndex((row, i) => i > 0 && row[0] === date);
+      if (oldDateRow !== -1) {
+        const currentVal = parseFloat(mainData[oldDateRow][projectIndex] || "0");
+        mainData[oldDateRow][projectIndex] = currentVal - oldDuration + newDuration;
+        const total = mainHeader
+          .slice(2)
+          .reduce((sum, _, idx) => sum + parseFloat(mainData[oldDateRow][idx + 2] || "0"), 0);
+        mainData[oldDateRow][1] = total;
+      }
+    }
+    workbook.Sheets[MAIN_SHEET_NAME] = XLSX.utils.aoa_to_sheet(mainData);
+    rebuildAnalyticsSheet(workbook);
+    writeWorkbook(workbook, excelFilePath);
+  } catch (error) {
+    console.error("Error updating time entry:", error);
+    throw new Error("Не удалось обновить запись времени.");
+  }
+}
+
+export function deleteTimeEntry(id: string) {
+  try {
+    initializeExcelFile();
+    const excelFilePath = getExcelFilePath();
+    const workbook = readWorkbook(excelFilePath);
+    const parts = id.split("|");
+    if (parts.length !== 4) throw new Error("Invalid entry ID");
+    const project = parts[0];
+    const date = parts[1];
+    const startTime = parts[2];
+    const endTime = parts[3];
+    if (!workbook.SheetNames.includes(project)) {
+      throw new Error("Project not found");
+    }
+    const sheet = workbook.Sheets[project];
+    const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    const normalizedDate = normalizeDateString(date);
+    const rowIdx = data.findIndex(
+      (row, idx) =>
+        idx > 0 &&
+        normalizeDateString(row[0] || "") === normalizedDate &&
+        row[1] === startTime &&
+        row[2] === endTime
+    );
+    if (rowIdx === -1) throw new Error("Entry not found");
+    const duration = parseFloat(data[rowIdx][3] || "0");
+    data.splice(rowIdx, 1);
+    workbook.Sheets[project] = XLSX.utils.aoa_to_sheet(data);
+    // Update main sheet
+    const mainSheet = workbook.Sheets[MAIN_SHEET_NAME];
+    const mainData: any[][] = XLSX.utils.sheet_to_json(mainSheet, { header: 1 });
+    const mainHeader = mainData[0];
+    const projectIndex = mainHeader.indexOf(project);
+    if (projectIndex !== -1) {
+      const dateRow = mainData.findIndex((row, i) => i > 0 && row[0] === date);
+      if (dateRow !== -1) {
+        const currentVal = parseFloat(mainData[dateRow][projectIndex] || "0");
+        mainData[dateRow][projectIndex] = currentVal - duration;
+        const total = mainHeader
+          .slice(2)
+          .reduce((sum, _, idx) => sum + parseFloat(mainData[dateRow][idx + 2] || "0"), 0);
+        mainData[dateRow][1] = total;
+      }
+    }
+    workbook.Sheets[MAIN_SHEET_NAME] = XLSX.utils.aoa_to_sheet(mainData);
+    rebuildAnalyticsSheet(workbook);
+    writeWorkbook(workbook, excelFilePath);
+  } catch (error) {
+    console.error("Error deleting time entry:", error);
+    throw new Error("Не удалось удалить запись времени.");
+  }
 }
 
 export function getActiveTimers(): Timer[] {
@@ -551,4 +697,49 @@ function rebuildAnalyticsSheet(workbook: XLSX.WorkBook) {
   } else {
     XLSX.utils.book_append_sheet(workbook, sheet, ANALYTICS_SHEET_NAME);
   }
+}
+
+export function exportProjectData(projectName: string): Buffer {
+  initializeExcelFile();
+  const excelFilePath = getExcelFilePath();
+  const workbook = readWorkbook(excelFilePath);
+
+  if (!workbook.SheetNames.includes(projectName)) {
+    throw new Error("Проект не найден");
+  }
+
+  // Create new workbook for export
+  const exportWorkbook = XLSX.utils.book_new();
+
+  // 1. Copy time entries sheet
+  const projectSheet = workbook.Sheets[projectName];
+  const projectData: any[][] = XLSX.utils.sheet_to_json(projectSheet, { header: 1 });
+  const entriesSheet = XLSX.utils.aoa_to_sheet(projectData);
+  XLSX.utils.book_append_sheet(exportWorkbook, entriesSheet, "Записи времени");
+
+  // 2. Create analytics sheet for this project only
+  const hourlyRate = getHourlyRate(projectName, workbook);
+  const entries = getProjectEntries(projectName);
+
+  const totalHours = entries.reduce((sum, e) => sum + e.duration, 0);
+  const totalCost = parseFloat((totalHours * hourlyRate).toFixed(2));
+
+  const analyticsRows: any[][] = [
+    ["Проект", "Часов", "Ставка (€/ч)", "Стоимость (€)"],
+    [projectName, totalHours, hourlyRate, totalCost],
+    [],
+    ["Всего записей", entries.length],
+    [
+      "Период",
+      entries.length > 0 ? `${entries[entries.length - 1].date} — ${entries[0].date}` : "—",
+    ],
+  ];
+
+  const analyticsSheet = XLSX.utils.aoa_to_sheet(analyticsRows);
+  (analyticsSheet as any)["!cols"] = [{ wch: 28 }, { wch: 14 }, { wch: 14 }, { wch: 16 }];
+  XLSX.utils.book_append_sheet(exportWorkbook, analyticsSheet, "Аналитика");
+
+  // Write to buffer
+  const buffer = XLSX.write(exportWorkbook, { type: "buffer", bookType: "xlsx" });
+  return buffer;
 }
